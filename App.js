@@ -2,14 +2,33 @@ import { StatusBar } from "expo-status-bar";
 import { Text, TouchableOpacity, View, StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function App() {
-
   const setTime = 60;
 
   const [isWell, setIsWell] = useState(false);
   const [timeLeft, setTimeLeft] = useState(setTime);
   const [lastConfirmed, setLastConfirmed] = useState(null);
+
+  useEffect(() => {
+    const loadLastConfirmed = async () => {
+      const value = await AsyncStorage.getItem("lastConfirmed");
+      if (value) setLastConfirmed(new Date(value));
+
+      const endTimestamp = await AsyncStorage.getItem("endTimestamp");
+      if (endTimestamp) {
+        const now = new Date();
+        const end = parseInt(endTimestamp, 10);
+        const diff = Math.floor((end - now.getTime()) / 1000);
+        if (diff > 0) {
+          setIsWell(true);
+          setTimeLeft(diff);
+        }
+      }
+    };
+    loadLastConfirmed();
+  }, []);
 
   useEffect(() => {
     let interval = null;
@@ -21,6 +40,7 @@ export default function App() {
     } else if (timeLeft === 0) {
       setIsWell(false);
       setTimeLeft(setTime);
+      AsyncStorage.removeItem("endTimestamp");
     }
 
     return () => {
@@ -28,15 +48,23 @@ export default function App() {
     };
   }, [isWell, timeLeft]);
 
-  const handlePress = () => {
+  const handlePress = async () => {
     setIsWell(true);
-    setLastConfirmed(new Date());
+    const now = new Date();
+    setLastConfirmed(now);
+    await AsyncStorage.setItem("lastConfirmed", now.toISOString());
+
+    const endTimestamp = now.getTime() + setTime * 1000;
+    await AsyncStorage.setItem("endTimestamp", endTimestamp.toString());
+    setTimeLeft(setTime);
   };
 
   const formatTime = (date) => {
     if (!date) return "--/--/-- a las --:--";
     const pad = (n) => n.toString().padStart(2, "0");
-    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} a las ${date.getHours()}:${pad(date.getMinutes())}`;
+    return `${date.getDate()}/${
+      date.getMonth() + 1
+    }/${date.getFullYear()} a las ${date.getHours()}:${pad(date.getMinutes())}`;
   };
 
   return (
@@ -46,9 +74,7 @@ export default function App() {
 
         {isWell ? (
           <View style={styles.circle}>
-            <Text style={styles.timerText}>
-              Vuelve en {timeLeft} segundos
-            </Text>
+            <Text style={styles.timerText}>Vuelve en {timeLeft} segundos</Text>
           </View>
         ) : (
           <TouchableOpacity
@@ -56,9 +82,7 @@ export default function App() {
             activeOpacity={0.8}
             onPress={handlePress}
           >
-            <Text style={styles.buttonText}>
-              Estoy Bien
-            </Text>
+            <Text style={styles.buttonText}>Estoy Bien</Text>
           </TouchableOpacity>
         )}
 
@@ -66,9 +90,7 @@ export default function App() {
           <Text style={styles.infoLabel}>
             Última vez que dijiste que estabas bien:
           </Text>
-          <Text style={styles.infoTime}>
-            {formatTime(lastConfirmed)}
-          </Text>
+          <Text style={styles.infoTime}>{formatTime(lastConfirmed)}</Text>
         </View>
       </View>
     </SafeAreaProvider>
