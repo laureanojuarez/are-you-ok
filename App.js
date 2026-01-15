@@ -1,12 +1,14 @@
-import { StatusBar } from 'expo-status-bar';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import './global.css'
-import { useEffect, useState } from 'react';
+import { StatusBar } from "expo-status-bar";
+import { Text, TouchableOpacity, View, StyleSheet } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useEffect, useState } from "react";
 
 export default function App() {
+
+  const setTime = 60;
+
   const [isWell, setIsWell] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(15);
+  const [timeLeft, setTimeLeft] = useState(setTime);
   const [lastConfirmed, setLastConfirmed] = useState(null);
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export default function App() {
       }, 1000);
     } else if (timeLeft === 0) {
       setIsWell(false);
-      setTimeLeft(15); // Reset timer for next time
+      setTimeLeft(setTime);
     }
 
     return () => {
@@ -33,39 +35,105 @@ export default function App() {
 
   const formatTime = (date) => {
     if (!date) return "--/--/-- a las --:--";
-    const pad = (n) => n.toString().padStart(2, '0');
+    const pad = (n) => n.toString().padStart(2, "0");
     return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} a las ${date.getHours()}:${pad(date.getMinutes())}`;
   };
 
   return (
     <SafeAreaProvider>
-      <View className="flex-1 items-center justify-center bg-white">
+      <View style={styles.container}>
         <StatusBar style="auto" />
 
         {isWell ? (
-          <View className="bg-white w-64 h-64 rounded-full items-center justify-center border-2 border-gray-100">
-               <Text className="text-2xl font-italic text-center p-4">
-                  Vuelve en {timeLeft} segundos
-              </Text>
+          <View style={styles.circle}>
+            <Text style={styles.timerText}>
+              Vuelve en {timeLeft} segundos
+            </Text>
           </View>
         ) : (
-          <TouchableOpacity 
-            className="bg-green-200 w-64 h-64 rounded-full items-center justify-center shadow-lg active:bg-green-300 transition-all" 
+          <TouchableOpacity
+            style={styles.button}
+            activeOpacity={0.8}
             onPress={handlePress}
           >
-            <Text className="text-2xl font-italic text-green-900">Estoy Bien</Text>
+            <Text style={styles.buttonText}>
+              Estoy Bien
+            </Text>
           </TouchableOpacity>
         )}
 
-        <View className="mt-8 items-center px-6">
-          <Text className="text-lg text-gray-500 font-italic text-center">
+        <View style={styles.infoContainer}>
+          <Text style={styles.infoLabel}>
             Última vez que dijiste que estabas bien:
           </Text>
-          <Text className="text-xl font-bold text-gray-800 mt-2">
-              {formatTime(lastConfirmed)}
+          <Text style={styles.infoTime}>
+            {formatTime(lastConfirmed)}
           </Text>
         </View>
       </View>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  circle: {
+    backgroundColor: "#fff",
+    width: 256,
+    height: 256,
+    borderRadius: 128,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+  },
+  timerText: {
+    fontSize: 24,
+    fontStyle: "italic",
+    textAlign: "center",
+    padding: 16,
+    color: "#222",
+  },
+  button: {
+    backgroundColor: "#bbf7d0",
+    width: 256,
+    height: 256,
+    borderRadius: 128,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  buttonText: {
+    fontSize: 24,
+    fontStyle: "italic",
+    color: "#166534",
+    textAlign: "center",
+  },
+  infoContainer: {
+    marginTop: 32,
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  infoLabel: {
+    fontSize: 18,
+    color: "#6b7280",
+    fontStyle: "italic",
+    textAlign: "center",
+  },
+  infoTime: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1f2937",
+    marginTop: 8,
+    textAlign: "center",
+  },
+});
