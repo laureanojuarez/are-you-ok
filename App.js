@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function App() {
-  const setTime = 60;
+  const setTime = 24 * 60 * 60;
 
   const [isWell, setIsWell] = useState(false);
   const [timeLeft, setTimeLeft] = useState(setTime);
@@ -41,6 +41,7 @@ export default function App() {
       setIsWell(false);
       setTimeLeft(setTime);
       AsyncStorage.removeItem("endTimestamp");
+      sendAlert();
     }
 
     return () => {
@@ -67,24 +68,41 @@ export default function App() {
     }/${date.getFullYear()} a las ${date.getHours()}:${pad(date.getMinutes())}`;
   };
 
+  const alertMessage =
+    "Persona X no ha confirmado que está bien en el tiempo establecido. Por favor, verifica su estado.";
+
+  const sendAlert = () => {
+    console.log("Alerta enviada a contacto de emergencia:", alertMessage);
+  };
+
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
         <StatusBar style="auto" />
 
-        {isWell ? (
-          <View style={styles.circle}>
-            <Text style={styles.timerText}>Vuelve en {timeLeft} segundos</Text>
+        <TouchableOpacity
+          style={styles.button}
+          activeOpacity={0.5}
+          onPress={handlePress}
+        >
+          <Text style={styles.buttonText}>Estoy Bien</Text>
+        </TouchableOpacity>
+
+        {isWell && (
+          <View style={styles.timerContainer}>
+            <Text style={styles.timerText}>
+              Debes hacer check-in en {Math.floor(timeLeft / 3600)} h{" "}
+              {Math.floor((timeLeft % 3600) / 60)}m {timeLeft % 60}s
+            </Text>
           </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.button}
-            activeOpacity={0.8}
-            onPress={handlePress}
-          >
-            <Text style={styles.buttonText}>Estoy Bien</Text>
-          </TouchableOpacity>
         )}
+
+        <View style={styles.infoContainer}>
+          <Text style={styles.infoText}>
+            Si no das señal de vida despues de 48 horas, se enviará una alerta a
+            tu contacto de emergencia.
+          </Text>
+        </View>
 
         <View style={styles.infoContainer}>
           <Text style={styles.infoLabel}>
@@ -115,10 +133,9 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
   },
   timerText: {
-    fontSize: 24,
+    fontSize: 18,
     fontStyle: "italic",
     textAlign: "center",
-    padding: 16,
     color: "#222",
   },
   button: {
@@ -140,11 +157,7 @@ const styles = StyleSheet.create({
     color: "#166534",
     textAlign: "center",
   },
-  infoContainer: {
-    marginTop: 32,
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
+
   infoLabel: {
     fontSize: 18,
     color: "#6b7280",
@@ -156,6 +169,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#1f2937",
     marginTop: 8,
+    textAlign: "center",
+  },
+  infoContainer: {
+    padding: 32,
+    textAlign: "center",
+  },
+  timerContainer: {
+    marginTop: 24,
+    alignItems: "center",
+  },
+  infoText: {
+    fontSize: 14,
+    color: "#6b7280",
     textAlign: "center",
   },
 });
