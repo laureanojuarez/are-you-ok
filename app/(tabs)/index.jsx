@@ -1,17 +1,37 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../services/FirebaseConfig";
+import WellnessButton from "../../components/WellnessButton";
+import TimerDisplay from "../../components/TimerDisplay";
+import InfoSection from "../../components/InfoSection";
 
 export default function Tab() {
   const setTime = 24 * 60 * 60;
 
+  const [user, setUser] = useState(null);
   const [isWell, setIsWell] = useState(false);
   const [timeLeft, setTimeLeft] = useState(setTime);
   const [lastConfirmed, setLastConfirmed] = useState(null);
 
+  const router = useRouter();
+
+  // Handle Authentication State
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return; // Don't load if not logged in
+
     const loadLastConfirmed = async () => {
       const value = await AsyncStorage.getItem("lastConfirmed");
       if (value) setLastConfirmed(new Date(value));
@@ -28,7 +48,7 @@ export default function Tab() {
       }
     };
     loadLastConfirmed();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let interval = null;
@@ -50,6 +70,11 @@ export default function Tab() {
   }, [isWell, timeLeft]);
 
   const handlePress = async () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
     setIsWell(true);
     const now = new Date();
     setLastConfirmed(now);
@@ -80,36 +105,16 @@ export default function Tab() {
       <View style={styles.container}>
         <StatusBar style="auto" />
 
-        <TouchableOpacity
-          style={styles.button}
-          activeOpacity={0.5}
-          onPress={handlePress}
-        >
-          <Text style={styles.buttonText}>Estoy Bien</Text>
-        </TouchableOpacity>
+        <WellnessButton onPress={handlePress} />
 
-        {isWell && (
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerText}>
-              Debes hacer check-in en {Math.floor(timeLeft / 3600)} h{" "}
-              {Math.floor((timeLeft % 3600) / 60)}m {timeLeft % 60}s
-            </Text>
-          </View>
-        )}
+        {isWell && <TimerDisplay timeLeft={timeLeft} />}
 
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoText}>
-            Si no das señal de vida despues de 48 horas, se enviará una alerta a
-            tu contacto de emergencia.
-          </Text>
-        </View>
+        <InfoSection description="Si no das señal de vida despues de 48 horas, se enviará una alerta a tu contacto de emergencia." />
 
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoLabel}>
-            Última vez que dijiste que estabas bien:
-          </Text>
-          <Text style={styles.infoTime}>{formatTime(lastConfirmed)}</Text>
-        </View>
+        <InfoSection
+          label="Última vez que dijiste que estabas bien:"
+          value={formatTime(lastConfirmed)}
+        />
       </View>
     </SafeAreaProvider>
   );
@@ -121,67 +126,5 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
-  },
-  circle: {
-    backgroundColor: "#fff",
-    width: 256,
-    height: 256,
-    borderRadius: 128,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
-  },
-  timerText: {
-    fontSize: 18,
-    fontStyle: "italic",
-    textAlign: "center",
-    color: "#222",
-  },
-  button: {
-    backgroundColor: "#bbf7d0",
-    width: 256,
-    height: 256,
-    borderRadius: 128,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  buttonText: {
-    fontSize: 24,
-    fontStyle: "italic",
-    color: "#166534",
-    textAlign: "center",
-  },
-
-  infoLabel: {
-    fontSize: 18,
-    color: "#6b7280",
-    fontStyle: "italic",
-    textAlign: "center",
-  },
-  infoTime: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  infoContainer: {
-    padding: 32,
-    textAlign: "center",
-  },
-  timerContainer: {
-    marginTop: 24,
-    alignItems: "center",
-  },
-  infoText: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
   },
 });
