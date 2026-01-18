@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { StyleSheet, View, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
@@ -9,6 +9,17 @@ import { auth } from "../../services/FirebaseConfig";
 import WellnessButton from "../../components/WellnessButton";
 import TimerDisplay from "../../components/TimerDisplay";
 import InfoSection from "../../components/InfoSection";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+
+// Configurar cómo se muestran las notificaciones
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function Tab() {
   const setTime = 24 * 60 * 60;
@@ -17,8 +28,34 @@ export default function Tab() {
   const [isWell, setIsWell] = useState(false);
   const [timeLeft, setTimeLeft] = useState(setTime);
   const [lastConfirmed, setLastConfirmed] = useState(null);
+  const notificationListener = useRef();
+  const responseListener = useRef();
 
   const router = useRouter();
+
+  // Solicitar permisos de notificaciones
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+
+    // Listener para notificaciones recibidas
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener((notification) => {
+        console.log("Notificación recibida:", notification);
+      });
+
+    // Listener para cuando el usuario toca la notificación
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log("Notificación tocada:", response);
+      });
+
+    return () => {
+      Notifications.removeNotificationSubscription(
+        notificationListener.current,
+      );
+      Notifications.removeNotificationSubscription(responseListener.current);
+    };
+  }, []);
 
   // Handle Authentication State
   useEffect(() => {
@@ -30,7 +67,7 @@ export default function Tab() {
   }, []);
 
   useEffect(() => {
-    if (!user) return; // Don't load if not logged in
+    if (!user) return;
 
     const loadLastConfirmed = async () => {
       const value = await AsyncStorage.getItem("lastConfirmed");
@@ -83,6 +120,29 @@ export default function Tab() {
     const endTimestamp = now.getTime() + setTime * 1000;
     await AsyncStorage.setItem("endTimestamp", endTimestamp.toString());
     setTimeLeft(setTime);
+
+    // Programar notificación para 24 horas después
+    await scheduleCheckInNotification();
+  };
+
+  const scheduleCheckInNotification = async () => {
+    // Cancelar notificaciones previas
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
+    // Programar notificación para 24 horas (86400 segundos)
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "¿Estás bien? 🔔",
+        body: "Han pasado 24 horas. Es hora de confirmar que estás bien.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: {
+        seconds: 24 * 60 * 60, // 24 horas
+      },
+    });
+
+    console.log("Notificación programada para 24 horas");
   };
 
   const formatTime = (date) => {
@@ -96,8 +156,19 @@ export default function Tab() {
   const alertMessage =
     "Persona X no ha confirmado que está bien en el tiempo establecido. Por favor, verifica su estado.";
 
-  const sendAlert = () => {
+  const sendAlert = async () => {
     console.log("Alerta enviada a contacto de emergencia:", alertMessage);
+
+    // Enviar notificación inmediata
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "⚠️ Alerta de Emergencia",
+        body: "No has confirmado tu estado. Se enviará alerta a tus contactos de emergencia.",
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      },
+      trigger: null, // Inmediato
+    });
   };
 
   return (
@@ -118,6 +189,39 @@ export default function Tab() {
       </View>
     </SafeAreaProvider>
   );
+}
+
+async function registerForPushNotificationsAsync() {
+  let token;
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== "granted") {
+      alert("No se obtuvieron permisos para notificaciones push");
+      return;
+    }
+  } else {
+    alert("Debes usar un dispositivo físico para las notificaciones push");
+  }
+
+  return token;
 }
 
 const styles = StyleSheet.create({
